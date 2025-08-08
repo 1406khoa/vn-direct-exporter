@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
-import { fetchHistory } from "../service/vndirect";  // nếu bạn dùng `services` thì đổi lại path tương ứng
-import type { MarketContextRow, OhlcvRow, RiskProfile, Timeframe } from "../types";
+import { fetchHistory } from "../service/vndirect";
+import type {
+  MarketContextRow,
+  OhlcvRow,
+  RiskProfile,
+  Timeframe,
+} from "../types";
 import { daysAgo, parseIsoDate, toIsoDate } from "../lib/date";
 import { exportWorkbook } from "../utils/excel";
+import "./PreviewModal.css";
+import PreviewModal from "./PreviewModal";
 
 type RangeMode = "lastNDays" | "custom";
 
-import './MarketForm.css';
+import "./MarketForm.css";
 
 export default function MarketForm() {
   const [symbol, setSymbol] = useState("E1VFVN30");
@@ -16,6 +23,8 @@ export default function MarketForm() {
 
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [previewRows, setPreviewRows] = useState<OhlcvRow[]>([]);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   // Risk profile inputs
   const [capital, setCapital] = useState("");
@@ -79,7 +88,7 @@ export default function MarketForm() {
         }));
         // Nhóm theo tuần (Monday là đầu tuần)
         const groups: Record<string, typeof daily> = {};
-        daily.forEach(item => {
+        daily.forEach((item) => {
           const d = item.date;
           const dow = d.getUTCDay(); // 0=Sun,1=Mon...
           const weekStart = new Date(d);
@@ -95,15 +104,17 @@ export default function MarketForm() {
             return {
               Date: wk,
               Open: grp[0].open,
-              High: Math.max(...grp.map(r => r.high)),
-              Low: Math.min(...grp.map(r => r.low)),
+              High: Math.max(...grp.map((r) => r.high)),
+              Low: Math.min(...grp.map((r) => r.low)),
               Close: grp[grp.length - 1].close,
               Volume: grp.reduce((sum, r) => sum + r.volume, 0),
               Symbol: symbol.trim().toUpperCase(),
               Timeframe: "W" as Timeframe,
             };
           })
-          .sort((a, b) => new Date(a.Date).getTime() - new Date(b.Date).getTime());
+          .sort(
+            (a, b) => new Date(a.Date).getTime() - new Date(b.Date).getTime()
+          );
       } else {
         // — Daily: gọi API 1D
         const rawDaily = await fetchHistory(
@@ -112,16 +123,18 @@ export default function MarketForm() {
           from,
           to
         );
-        rows = rawDaily.t.map((ts, i): OhlcvRow => ({
-          Date: new Date(ts * 1000).toISOString().slice(0, 10),
-          Open: rawDaily.o[i],
-          High: rawDaily.h[i],
-          Low: rawDaily.l[i],
-          Close: rawDaily.c[i],
-          Volume: rawDaily.v[i],
-          Symbol: symbol.trim().toUpperCase(),
-          Timeframe: "D" as Timeframe,
-        }));
+        rows = rawDaily.t.map(
+          (ts, i): OhlcvRow => ({
+            Date: new Date(ts * 1000).toISOString().slice(0, 10),
+            Open: rawDaily.o[i],
+            High: rawDaily.h[i],
+            Low: rawDaily.l[i],
+            Close: rawDaily.c[i],
+            Volume: rawDaily.v[i],
+            Symbol: symbol.trim().toUpperCase(),
+            Timeframe: "D" as Timeframe,
+          })
+        );
       }
 
       if (!rows.length) {
@@ -165,82 +178,176 @@ export default function MarketForm() {
     }
   };
 
+  // New: preview handler
+  const handlePreview = async () => {
+    try {
+      // reuse the same fetch logic as export
+      let from: Date, to: Date;
+      if (rangeMode === "lastNDays") {
+        to = new Date();
+        from = daysAgo(nDays);
+      } else {
+        if (!fromDate || !toDate) throw new Error("Please pick dates");
+        from = parseIsoDate(fromDate);
+        to = parseIsoDate(toDate);
+      }
+      // always fetch daily then aggregate if needed
+      const raw = await fetchHistory(
+        symbol.trim().toUpperCase(),
+        "D",
+        from,
+        to
+      );
+      let rows: OhlcvRow[];
+      if (timeframe === "W") {
+               // — Weekly: fetch daily rồi aggregate thành tuần
+        const rawDaily = await fetchHistory(
+          symbol.trim().toUpperCase(),
+          "D",
+          from,
+          to
+        );
+        const daily = rawDaily.t.map((ts, i) => ({
+          date: new Date(ts * 1000),
+          open: rawDaily.o[i],
+          high: rawDaily.h[i],
+          low: rawDaily.l[i],
+          close: rawDaily.c[i],
+          volume: rawDaily.v[i],
+        }));
+        // Nhóm theo tuần (Monday là đầu tuần)
+        const groups: Record<string, typeof daily> = {};
+        daily.forEach((item) => {
+          const d = item.date;
+          const dow = d.getUTCDay(); // 0=Sun,1=Mon...
+          const weekStart = new Date(d);
+          weekStart.setUTCDate(d.getUTCDate() - ((dow + 6) % 7));
+          const key = weekStart.toISOString().slice(0, 10);
+          if (!groups[key]) groups[key] = [];
+          groups[key].push(item);
+        });
+        // Tạo mảng OhlcvRow tuần
+        rows = Object.entries(groups)
+          .map(([wk, grp]): OhlcvRow => {
+            grp.sort((a, b) => a.date.getTime() - b.date.getTime());
+            return {
+              Date: wk,
+              Open: grp[0].open,
+              High: Math.max(...grp.map((r) => r.high)),
+              Low: Math.min(...grp.map((r) => r.low)),
+              Close: grp[grp.length - 1].close,
+              Volume: grp.reduce((sum, r) => sum + r.volume, 0),
+              Symbol: symbol.trim().toUpperCase(),
+              Timeframe: "W" as Timeframe,
+            };
+          })
+          .sort(
+            (a, b) => new Date(a.Date).getTime() - new Date(b.Date).getTime()
+          );
+      } else {
+        rows = raw.t.map(
+          (ts, i): OhlcvRow => ({
+            Date: new Date(ts * 1000).toISOString().slice(0, 10),
+            Open: raw.o[i],
+            High: raw.h[i],
+            Low: raw.l[i],
+            Close: raw.c[i],
+            Volume: raw.v[i],
+            Symbol: symbol.trim().toUpperCase(),
+            Timeframe: "D",
+          })
+        );
+      }
+      if (!rows.length) throw new Error("No data to preview");
+      setPreviewRows(rows);
+      setPreviewOpen(true);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const canPickDates = rangeMode === "custom";
 
   return (
     <div className="market-form mx-auto max-w-3xl p-4">
-      <h1 className="text-2xl font-bold mb-4">VNDIRECT OHLCV Exporter</h1>
+      <h1 className="text-2xl font-bold mb-4">VNDIRECT - Xuất Dữ Liệu OHLCV</h1>
 
       {/* Symbol & Timeframe */}
       <section className="mb-6 space-y-2">
-        <h2 className="text-lg font-semibold">Symbol & Timeframe</h2>
+        <h2 className="text-lg font-semibold">Mã Chứng Khoán & Khung Thời Gian</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <label className="flex flex-col">
-            <span>Symbol</span>
+            <span>Mã CK</span>
             <input
               value={symbol}
-              onChange={e => setSymbol(e.target.value)}
+              onChange={(e) => setSymbol(e.target.value)}
               placeholder="E1VFVN30"
               className="border rounded p-2"
             />
+            <span className="text-gray-400 text-sm mt-1">VD: VNM, HPG, VIC</span>
           </label>
           <label className="flex flex-col">
-            <span>Timeframe</span>
+            <span>Khung Thời Gian</span>
             <select
               value={timeframe}
-              onChange={e => setTimeframe(e.target.value as Timeframe)}
+              onChange={(e) => setTimeframe(e.target.value as Timeframe)}
               className="border rounded p-2"
             >
-              <option value="D">1D</option>
-              <option value="W">1W</option>
+              <option value="D">Ngày (D)</option>
+              <option value="W">Tuần (W)</option>
             </select>
+            <span className="text-gray-400 text-sm mt-1">Chọn chu kỳ nến</span>
           </label>
           <label className="flex flex-col">
-            <span>Range Mode</span>
+            <span>Chế Độ Thời Gian</span>
             <select
               value={rangeMode}
-              onChange={e => setRangeMode(e.target.value as RangeMode)}
+              onChange={(e) => setRangeMode(e.target.value as RangeMode)}
               className="border rounded p-2"
             >
-              <option value="lastNDays">Last N days</option>
-              <option value="custom">Custom From/To</option>
+              <option value="lastNDays">N ngày gần nhất</option>
+              <option value="custom">Tùy chọn Từ/Đến</option>
             </select>
+            <span className="text-gray-400 text-sm mt-1">Chọn khoảng thời gian</span>
           </label>
         </div>
 
         {rangeMode === "lastNDays" && (
           <label className="flex flex-col mt-3">
-            <span>N days</span>
+            <span>Số ngày gần nhất</span>
             <input
               type="number"
               min={1}
               max={3650}
               value={nDays}
-              onChange={e => setNDays(Number(e.target.value))}
+              onChange={(e) => setNDays(Number(e.target.value))}
               className="border rounded p-2"
             />
+            <span className="text-gray-400 text-sm mt-1">VD: 90 ngày, 180 ngày, 360 ngày</span>
           </label>
         )}
 
         {canPickDates && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
             <label className="flex flex-col">
-              <span>From</span>
+              <span>Từ Ngày</span>
               <input
                 type="date"
                 value={fromDate}
-                onChange={e => setFromDate(e.target.value)}
+                onChange={(e) => setFromDate(e.target.value)}
                 className="border rounded p-2"
               />
+              <span className="text-gray-400 text-sm mt-1">Ngày bắt đầu</span>
             </label>
             <label className="flex flex-col">
-              <span>To</span>
+              <span>Đến Ngày</span>
               <input
                 type="date"
                 value={toDate}
-                onChange={e => setToDate(e.target.value)}
+                onChange={(e) => setToDate(e.target.value)}
                 className="border rounded p-2"
               />
+              <span className="text-gray-400 text-sm mt-1">Ngày kết thúc</span>
             </label>
           </div>
         )}
@@ -248,137 +355,173 @@ export default function MarketForm() {
 
       {/* Risk Profile */}
       <section className="mb-6 space-y-2">
-        <h2 className="text-lg font-semibold">Risk Profile <span className="optional-label">(optional)</span></h2>
+        <h2 className="text-lg font-semibold">
+          Quản Lý Rủi Ro <span className="optional-label">(không bắt buộc)</span>
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <label className="flex flex-col">
-            <span>Capital (VND)</span>
+            <span>Vốn Đầu Tư (VNĐ)</span>
             <input
               value={capital}
-              onChange={e => setCapital(e.target.value)}
+              onChange={(e) => setCapital(e.target.value)}
               className="border rounded p-2"
+              placeholder="100000000"
             />
+            <span className="text-gray-400 text-sm mt-1">VD: 100,000,000</span>
           </label>
           <label className="flex flex-col">
-            <span>Max Drawdown (%)</span>
+            <span>Mức Lỗ Chấp Nhận (%)</span>
             <input
               value={maxDD}
-              onChange={e => setMaxDD(e.target.value)}
+              onChange={(e) => setMaxDD(e.target.value)}
               className="border rounded p-2"
+              placeholder="7"
             />
+            <span className="text-gray-400 text-sm mt-1">VD: 7 (7%)</span>
           </label>
           <label className="flex flex-col">
-            <span>Target Profit (%)</span>
+            <span>Mục Tiêu Lợi Nhuận (%)</span>
             <input
               value={targetProfit}
-              onChange={e => setTargetProfit(e.target.value)}
+              onChange={(e) => setTargetProfit(e.target.value)}
               className="border rounded p-2"
+              placeholder="15"
             />
+            <span className="text-gray-400 text-sm mt-1">VD: 15 (15%)</span>
           </label>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
           <label className="flex flex-col">
-            <span>Holding Horizon</span>
+            <span>Thời Gian Nắm Giữ</span>
             <input
               value={horizon}
-              onChange={e => setHorizon(e.target.value)}
+              onChange={(e) => setHorizon(e.target.value)}
               className="border rounded p-2"
+              placeholder="3-6 tháng"
             />
+            <span className="text-gray-400 text-sm mt-1">VD: 3-6 tháng, 1 năm</span>
           </label>
           <label className="flex flex-col md:col-span-2">
-            <span>Notes</span>
+            <span>Ghi Chú</span>
             <input
               value={riskNotes}
-              onChange={e => setRiskNotes(e.target.value)}
+              onChange={(e) => setRiskNotes(e.target.value)}
               className="border rounded p-2"
+              placeholder="Ghi chú thêm về chiến lược"
             />
+            <span className="text-gray-400 text-sm mt-1">Các thông tin bổ sung về chiến lược</span>
           </label>
         </div>
       </section>
 
       {/* Market Context */}
       <section className="mb-6 space-y-2">
-        <h2 className="text-lg font-semibold">Market Context <span className="optional-label">(optional)</span></h2>
+        <h2 className="text-lg font-semibold">
+          Phân Tích Thị Trường <span className="optional-label">(không bắt buộc)</span>
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <label className="flex flex-col">
-            <span>News/Event Date</span>
+            <span>Ngày Tin/Sự Kiện</span>
             <input
               type="date"
               value={mcDate}
-              onChange={e => setMcDate(e.target.value)}
+              onChange={(e) => setMcDate(e.target.value)}
               className="border rounded p-2"
             />
+            <span className="text-gray-400 text-sm mt-1">Ngày có tin tức quan trọng</span>
           </label>
           <label className="flex flex-col md:col-span-2">
-            <span>Headline / Note</span>
+            <span>Tiêu Đề / Ghi Chú</span>
             <input
               value={mcHeadline}
-              onChange={e => setMcHeadline(e.target.value)}
+              onChange={(e) => setMcHeadline(e.target.value)}
               className="border rounded p-2"
+              placeholder="Tin tức hoặc sự kiện quan trọng"
             />
+            <span className="text-gray-400 text-sm mt-1">VD: Công ty công bố kết quả kinh doanh Q2</span>
           </label>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
           <label className="flex flex-col">
-            <span>Source / Link</span>
+            <span>Nguồn / Link</span>
             <input
               value={mcLink}
-              onChange={e => setMcLink(e.target.value)}
+              onChange={(e) => setMcLink(e.target.value)}
               className="border rounded p-2"
+              placeholder="URL nguồn tin"
             />
+            <span className="text-gray-400 text-sm mt-1">Link bài viết hoặc nguồn tin</span>
           </label>
           <label className="flex flex-col">
-            <span>Support Zone</span>
+            <span>Vùng Hỗ Trợ</span>
             <input
               value={mcSupport}
-              onChange={e => setMcSupport(e.target.value)}
+              onChange={(e) => setMcSupport(e.target.value)}
               className="border rounded p-2"
+              placeholder="20.5-21.0"
             />
+            <span className="text-gray-400 text-sm mt-1">VD: 20.5-21.0</span>
           </label>
           <label className="flex flex-col">
-            <span>Resistance Zone</span>
+            <span>Vùng Kháng Cự</span>
             <input
               value={mcResistance}
-              onChange={e => setMcResistance(e.target.value)}
+              onChange={(e) => setMcResistance(e.target.value)}
               className="border rounded p-2"
+              placeholder="23.5-24.0"
             />
+            <span className="text-gray-400 text-sm mt-1">VD: 23.5-24.0</span>
           </label>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
           <label className="flex flex-col">
-            <span>Planned Buy Zone</span>
+            <span>Vùng Giá Dự Kiến Mua</span>
             <input
               value={mcPlannedBuy}
-              onChange={e => setMcPlannedBuy(e.target.value)}
+              onChange={(e) => setMcPlannedBuy(e.target.value)}
               className="border rounded p-2"
+              placeholder="21.2-21.5"
             />
+            <span className="text-gray-400 text-sm mt-1">VD: 21.2-21.5</span>
           </label>
           <label className="flex flex-col">
-            <span>Actual Buy Price</span>
+            <span>Giá Mua Thực Tế</span>
             <input
               value={mcActualBuy}
-              onChange={e => setMcActualBuy(e.target.value)}
+              onChange={(e) => setMcActualBuy(e.target.value)}
               className="border rounded p-2"
+              placeholder="21.3"
             />
+            <span className="text-gray-400 text-sm mt-1">Giá mua đã thực hiện</span>
           </label>
           <label className="flex flex-col md:col-span-1">
-            <span>Comment</span>
+            <span>Nhận Xét</span>
             <input
               value={mcComment}
-              onChange={e => setMcComment(e.target.value)}
+              onChange={(e) => setMcComment(e.target.value)}
               className="border rounded p-2"
+              placeholder="Ghi chú phân tích"
             />
+            <span className="text-gray-400 text-sm mt-1">Các nhận xét bổ sung</span>
           </label>
         </div>
       </section>
 
       <div className="mt-6 text-center">
-        <button
-          onClick={handleExport}
-          className="export-button"
-        >
-          Export Excel
+        <button onClick={handleExport} className="export-button">
+          Xuất Excel
+        </button>
+
+        <button onClick={handlePreview} className="border rounded px-4 py-2 export-button">
+          Xem Trước
         </button>
       </div>
+      {/* Preview modal */}
+      <PreviewModal
+        visible={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        data={previewRows}
+      />
     </div>
   );
 }

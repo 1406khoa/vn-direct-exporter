@@ -9,6 +9,18 @@ export interface OhlcvRow {
   Volume: number;
   Symbol: string;
   Timeframe: Timeframe;
+  SMA20?: number;
+  SMA50?: number;
+  EMA20?: number;
+  EMA50?: number;
+  RSI14?: number;
+  ATR14?: number;
+  MACD?: number;
+  Signal?: number;
+  BB_Upper?: number;
+  BB_Lower?: number;
+  OBV?: number;
+  VWAP?: number;
 }
 
 export interface RiskProfile {

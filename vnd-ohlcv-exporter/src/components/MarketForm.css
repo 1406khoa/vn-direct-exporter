@@ -1,23 +1,32 @@
 .market-form {
   background-color: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  transition: all 0.3s ease;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 2rem;
+  max-width: 800px;
+  margin: 2rem auto;
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .market-form h1 {
   color: #1a365d;
-  border-bottom: 2px solid #e2e8f0;
+  border-bottom: 3px solid #4299e1;
   padding-bottom: 1rem;
   text-align: left;
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 2rem;
 }
 
 .market-form section {
-  background-color: #f8fafc;
-  border-radius: 8px;
-  padding: 1.5rem;
+  background: linear-gradient(to bottom right, #ffffff, #f8fafc);
+  border-radius: 12px;
+  padding: 2rem;
   margin-bottom: 2rem;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(66, 153, 225, 0.1);
 }
 
 .market-form section:hover {
@@ -43,46 +52,57 @@
 .market-form input,
 .market-form select {
   width: 100%;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  padding: 0.75rem;
-  font-size: 0.875rem;
-  transition: all 0.2s;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 1rem;
+  font-size: 1rem;
+  transition: all 0.3s ease;
   background-color: white;
+  color: #2d3748;
 }
 
 .market-form input:focus,
 .market-form select:focus {
   outline: none;
   border-color: #4299e1;
-  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.15);
+  box-shadow: 0 0 0 4px rgba(66, 153, 225, 0.15);
+  transform: translateY(-1px);
 }
 
 .market-form input:hover,
 .market-form select:hover {
-  border-color: #cbd5e0;
+  border-color: #4299e1;
+  background-color: #f8fafc;
 }
 
 .market-form input[type="date"] {
   color: #4a5568;
+  cursor: pointer;
 }
 
-.market-form button {
-  background-color: #4299e1;
+
+
+.export-button {
+  background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
   color: white;
   font-weight: 600;
-  padding: 0.75rem 2rem;
-  border-radius: 6px;
+  padding: 1rem 2.5rem;
+  border-radius: 12px;
   border: none;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
   cursor: pointer;
   width: 100%;
-  max-width: 200px;
+  max-width: 250px;
+  font-size: 1.1rem;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 6px -1px rgba(66, 153, 225, 0.2);
+  margin: 0 15px 0 15px;
 }
 
 .market-form button:hover {
   background-color: #3182ce;
   transform: translateY(-1px);
+  color: white;
 }
 
 .market-form button:active {
@@ -99,11 +119,11 @@
   .market-form {
     padding: 1rem;
   }
-  
+
   .market-form section {
     padding: 1rem;
   }
-  
+
   .market-form button {
     width: 100%;
     max-width: none;
