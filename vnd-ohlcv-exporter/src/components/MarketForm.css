@@ -5,9 +5,17 @@
     0 8px 10px -6px rgba(0, 0, 0, 0.1);
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 2rem;
+  width: 95%;
   max-width: 800px;
   margin: 2rem auto;
   border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+@media (max-width: 768px) {
+  .market-form {
+    padding: 1rem;
+    margin: 1rem auto;
+  }
 }
 
 .market-form h1 {
@@ -20,6 +28,13 @@
   margin-bottom: 2rem;
 }
 
+@media (max-width: 768px) {
+  .market-form h1 {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+}
+
 .market-form section {
   background: linear-gradient(to bottom right, #ffffff, #f8fafc);
   border-radius: 12px;
@@ -29,15 +44,39 @@
   border: 1px solid rgba(66, 153, 225, 0.1);
 }
 
+.market-form .grid {
+  margin-bottom: 1rem;
+}
+
+.market-form label {
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+  .market-form section {
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+}
+
 .market-form section:hover {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 }
 
 .market-form h2 {
   color: #2d3748;
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
   text-align: left;
   font-weight: 600;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.market-form label {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  width: 100%;
 }
 
 .market-form label span {
@@ -49,16 +88,28 @@
   font-weight: 500;
 }
 
+.market-form label .text-gray-400 {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #718096;
+}
+
 .market-form input,
 .market-form select {
   width: 100%;
   border: 2px solid #e2e8f0;
   border-radius: 10px;
-  padding: 1rem;
   font-size: 1rem;
   transition: all 0.3s ease;
   background-color: white;
   color: #2d3748;
+  height: 42px;
+  box-sizing: border-box;
+  margin-bottom: 0.25rem;
+}
+
+.market-form input[type="date"] {
+  min-height: 42px;
 }
 
 .market-form input:focus,
@@ -127,5 +178,6 @@
   .market-form button {
     width: 100%;
     max-width: none;
+    margin: 5px 0;
   }
 }
